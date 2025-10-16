@@ -1,0 +1,268 @@
+#!/bin/bash
+#
+# Bible Sync - Sync project Bibles with your master library
+#
+# Usage:
+#   bible-sync --import                   # Import all project Bibles to library
+#   bible-sync --import <project>         # Import specific project
+#   bible-sync --discover                 # Find projects with Bibles
+#   bible-sync --register <path>          # Register a new project
+#   bible-sync --status                   # Show sync status
+#
+
+set -e
+
+LIBRARY_DIR="$HOME/dev_bibles"
+REPOS_DIR="$HOME/repos"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+show_help() {
+    echo "Bible Sync - Sync project Bibles with your master library"
+    echo ""
+    echo "Usage:"
+    echo "  bible-sync --import                   Import all project Bibles to library"
+    echo "  bible-sync --import <project>         Import specific project"
+    echo "  bible-sync --discover                 Find projects with Bibles"
+    echo "  bible-sync --register <path>          Register a new project"
+    echo "  bible-sync --status                   Show sync status"
+    echo ""
+    echo "Examples:"
+    echo "  bible-sync --discover                 Find all projects with dev_bible/"
+    echo "  bible-sync --import                   Copy all Bibles to ~/dev_bibles/"
+    echo "  bible-sync --import pushfundz         Copy just pushfundz Bible"
+    echo "  bible-sync --register ~/my-project    Add new project to library"
+}
+
+discover_projects() {
+    echo -e "${CYAN}=== Discovering Projects with Bibles ===${NC}"
+    echo ""
+    
+    local found=0
+    
+    # Search in repos directory
+    if [ -d "$REPOS_DIR" ]; then
+        for project_dir in "$REPOS_DIR"/*; do
+            if [ -d "$project_dir/dev_bible" ]; then
+                local project=$(basename "$project_dir")
+                local bible_file="$project_dir/dev_bible/bible.jsonl"
+                if [ -f "$bible_file" ]; then
+                    local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+                    echo -e "${GREEN}✓${NC} $project"
+                    echo -e "  Path: $project_dir"
+                    echo -e "  Lessons: $count"
+                    echo ""
+                    found=$((found + 1))
+                fi
+            fi
+        done
+    fi
+    
+    if [ $found -eq 0 ]; then
+        echo -e "${YELLOW}No projects with dev_bible/ found${NC}"
+        echo ""
+        echo "To add a Bible to a project:"
+        echo "  cp -r /home/ubuntu/dev_bible /path/to/your-project/"
+    else
+        echo -e "${CYAN}Found $found project(s) with Bibles${NC}"
+        echo ""
+        echo "Run: bible-sync --import"
+    fi
+}
+
+import_all() {
+    echo -e "${CYAN}=== Importing All Project Bibles ===${NC}"
+    echo ""
+    
+    local imported=0
+    
+    if [ -d "$REPOS_DIR" ]; then
+        for project_dir in "$REPOS_DIR"/*; do
+            if [ -d "$project_dir/dev_bible" ]; then
+                local project=$(basename "$project_dir")
+                local source_bible="$project_dir/dev_bible/bible.jsonl"
+                
+                if [ -f "$source_bible" ]; then
+                    local target_dir="$LIBRARY_DIR/$project"
+                    mkdir -p "$target_dir"
+                    
+                    cp "$source_bible" "$target_dir/bible.jsonl"
+                    
+                    local count=$(wc -l < "$source_bible" 2>/dev/null || echo 0)
+                    echo -e "${GREEN}✓${NC} Imported $project ($count lessons)"
+                    imported=$((imported + 1))
+                fi
+            fi
+        done
+    fi
+    
+    if [ $imported -eq 0 ]; then
+        echo -e "${YELLOW}No Bibles to import${NC}"
+    else
+        echo ""
+        echo -e "${GREEN}Imported $imported project Bible(s)${NC}"
+        echo "View with: bible-search --list"
+    fi
+}
+
+import_project() {
+    local project="$1"
+    
+    echo -e "${CYAN}=== Importing $project Bible ===${NC}"
+    echo ""
+    
+    local source_bible="$REPOS_DIR/$project/dev_bible/bible.jsonl"
+    
+    if [ ! -f "$source_bible" ]; then
+        echo -e "${RED}Error: No Bible found at $source_bible${NC}"
+        exit 1
+    fi
+    
+    local target_dir="$LIBRARY_DIR/$project"
+    mkdir -p "$target_dir"
+    
+    cp "$source_bible" "$target_dir/bible.jsonl"
+    
+    local count=$(wc -l < "$source_bible" 2>/dev/null || echo 0)
+    echo -e "${GREEN}✓${NC} Imported $project ($count lessons)"
+    echo ""
+    echo "Search with: bible-search <tag> $project"
+}
+
+register_project() {
+    local project_path="$1"
+    
+    if [ ! -d "$project_path" ]; then
+        echo -e "${RED}Error: Directory not found: $project_path${NC}"
+        exit 1
+    fi
+    
+    local bible_file="$project_path/dev_bible/bible.jsonl"
+    if [ ! -f "$bible_file" ]; then
+        echo -e "${YELLOW}No Bible found in project${NC}"
+        echo ""
+        echo "Create one with:"
+        echo "  cp -r /home/ubuntu/dev_bible $project_path/"
+        exit 1
+    fi
+    
+    local project=$(basename "$project_path")
+    local target_dir="$LIBRARY_DIR/$project"
+    
+    mkdir -p "$target_dir"
+    cp "$bible_file" "$target_dir/bible.jsonl"
+    
+    local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+    echo -e "${GREEN}✓${NC} Registered $project ($count lessons)"
+    echo ""
+    echo "Now you can search with: bible-search <tag> $project"
+}
+
+show_status() {
+    echo -e "${CYAN}=== Bible Library Status ===${NC}"
+    echo ""
+    
+    # Check master
+    if [ -f "$LIBRARY_DIR/_master/bible.jsonl" ]; then
+        local master_count=$(wc -l < "$LIBRARY_DIR/_master/bible.jsonl")
+        echo -e "${GREEN}✓${NC} Master Bible: $master_count lessons"
+    else
+        echo -e "${RED}✗${NC} Master Bible not found"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Project Bibles in Library:${NC}"
+    
+    local project_count=0
+    local total_lessons=0
+    
+    for project_dir in "$LIBRARY_DIR"/*; do
+        if [ -d "$project_dir" ] && [ "$(basename "$project_dir")" != "_master" ]; then
+            local project=$(basename "$project_dir")
+            local bible_file="$project_dir/bible.jsonl"
+            
+            if [ -f "$bible_file" ]; then
+                local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+                echo -e "  ${GREEN}✓${NC} $project: $count lessons"
+                project_count=$((project_count + 1))
+                total_lessons=$((total_lessons + count))
+            fi
+        fi
+    done
+    
+    if [ $project_count -eq 0 ]; then
+        echo -e "  ${YELLOW}No projects imported yet${NC}"
+        echo ""
+        echo "Run: bible-sync --discover"
+    else
+        echo ""
+        echo -e "${CYAN}Total: $project_count projects, $total_lessons lessons${NC}"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Projects with Bibles (not yet imported):${NC}"
+    
+    local unsynced=0
+    
+    if [ -d "$REPOS_DIR" ]; then
+        for project_dir in "$REPOS_DIR"/*; do
+            if [ -d "$project_dir/dev_bible" ]; then
+                local project=$(basename "$project_dir")
+                local bible_file="$project_dir/dev_bible/bible.jsonl"
+                
+                if [ -f "$bible_file" ] && [ ! -f "$LIBRARY_DIR/$project/bible.jsonl" ]; then
+                    local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+                    echo -e "  ${YELLOW}⊙${NC} $project: $count lessons (not imported)"
+                    unsynced=$((unsynced + 1))
+                fi
+            fi
+        done
+    fi
+    
+    if [ $unsynced -eq 0 ]; then
+        echo -e "  ${GREEN}All projects synced${NC}"
+    else
+        echo ""
+        echo "Run: bible-sync --import"
+    fi
+}
+
+# Main logic
+case "${1:-}" in
+    --help|-h|"")
+        show_help
+        ;;
+    --discover)
+        discover_projects
+        ;;
+    --import)
+        if [ -n "${2:-}" ]; then
+            import_project "$2"
+        else
+            import_all
+        fi
+        ;;
+    --register)
+        if [ -z "${2:-}" ]; then
+            echo "Error: Please provide project path"
+            echo "Usage: bible-sync --register <path>"
+            exit 1
+        fi
+        register_project "$2"
+        ;;
+    --status)
+        show_status
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo ""
+        show_help
+        exit 1
+        ;;
+esac

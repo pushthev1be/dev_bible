@@ -1,0 +1,217 @@
+#!/bin/bash
+#
+# Bible Search - Search across all your project Bibles
+#
+# Usage:
+#   bible-search <tag>                    # Search all projects
+#   bible-search <tag> <project>          # Search specific project
+#   bible-search --master <tag>           # Search only master Bible
+#   bible-search --mistakes <tag>         # Find only mistakes
+#   bible-search --patterns <tag>         # Find only patterns
+#   bible-search --stats                  # Show stats for all Bibles
+#
+
+set -e
+
+LIBRARY_DIR="$HOME/dev_bibles"
+MASTER_BIBLE="$LIBRARY_DIR/_master/bible.jsonl"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+show_help() {
+    echo "Bible Search - Search across all your project Bibles"
+    echo ""
+    echo "Usage:"
+    echo "  bible-search <tag>                    Search all projects for tag"
+    echo "  bible-search <tag> <project>          Search specific project"
+    echo "  bible-search --master <tag>           Search only master Bible"
+    echo "  bible-search --mistakes <tag>         Find only mistakes"
+    echo "  bible-search --patterns <tag>         Find only patterns"
+    echo "  bible-search --personal               Show your personal flaws"
+    echo "  bible-search --stats                  Show stats for all Bibles"
+    echo "  bible-search --list                   List all projects"
+    echo ""
+    echo "Examples:"
+    echo "  bible-search auth                     Find all auth-related lessons"
+    echo "  bible-search wallet pushfundz         Find wallet lessons in pushfundz"
+    echo "  bible-search --mistakes security      Find all security mistakes"
+    echo "  bible-search --personal               Review your recurring issues"
+}
+
+show_stats() {
+    echo -e "${CYAN}=== Bible Library Stats ===${NC}"
+    echo ""
+    
+    # Master Bible
+    if [ -f "$MASTER_BIBLE" ]; then
+        local master_count=$(wc -l < "$MASTER_BIBLE" 2>/dev/null || echo 0)
+        echo -e "${YELLOW}Master Bible (Personal):${NC} $master_count lessons"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Project Bibles:${NC}"
+    
+    local total=0
+    for project_dir in "$LIBRARY_DIR"/*; do
+        if [ -d "$project_dir" ] && [ "$(basename "$project_dir")" != "_master" ]; then
+            local project=$(basename "$project_dir")
+            local bible_file="$project_dir/bible.jsonl"
+            if [ -f "$bible_file" ]; then
+                local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+                total=$((total + count))
+                echo "  $project: $count lessons"
+            fi
+        fi
+    done
+    
+    echo ""
+    echo -e "${GREEN}Total lessons across all projects: $total${NC}"
+}
+
+list_projects() {
+    echo -e "${CYAN}=== Your Project Bibles ===${NC}"
+    echo ""
+    echo -e "${YELLOW}_master${NC} (Personal cross-project knowledge)"
+    
+    for project_dir in "$LIBRARY_DIR"/*; do
+        if [ -d "$project_dir" ] && [ "$(basename "$project_dir")" != "_master" ]; then
+            local project=$(basename "$project_dir")
+            local bible_file="$project_dir/bible.jsonl"
+            if [ -f "$bible_file" ]; then
+                local count=$(wc -l < "$bible_file" 2>/dev/null || echo 0)
+                echo -e "${YELLOW}$project${NC} ($count lessons)"
+            fi
+        fi
+    done
+}
+
+search_all() {
+    local tag="$1"
+    local type_filter="$2"
+    
+    echo -e "${CYAN}=== Searching all Bibles for: '$tag' ===${NC}"
+    echo ""
+    
+    # Search master first
+    if [ -f "$MASTER_BIBLE" ]; then
+        local results=$(grep "\"$tag\"" "$MASTER_BIBLE" 2>/dev/null | grep -c "$type_filter" || true)
+        if [ "$results" -gt 0 ]; then
+            echo -e "${YELLOW}Master Bible:${NC}"
+            grep "\"$tag\"" "$MASTER_BIBLE" | grep "$type_filter" | while read -r line; do
+                echo "$line" | jq -r '"\(.type): [\(.id)] \(.symptom // .name // .text // .title)"'
+            done
+            echo ""
+        fi
+    fi
+    
+    # Search projects
+    for project_dir in "$LIBRARY_DIR"/*; do
+        if [ -d "$project_dir" ] && [ "$(basename "$project_dir")" != "_master" ]; then
+            local project=$(basename "$project_dir")
+            local bible_file="$project_dir/bible.jsonl"
+            if [ -f "$bible_file" ]; then
+                local results=$(grep "\"$tag\"" "$bible_file" 2>/dev/null | grep -c "$type_filter" || true)
+                if [ "$results" -gt 0 ]; then
+                    echo -e "${YELLOW}$project:${NC}"
+                    grep "\"$tag\"" "$bible_file" | grep "$type_filter" | while read -r line; do
+                        echo "$line" | jq -r '"\(.type): [\(.id)] \(.symptom // .name // .text // .title)"'
+                    done
+                    echo ""
+                fi
+            fi
+        fi
+    done
+}
+
+search_project() {
+    local tag="$1"
+    local project="$2"
+    local bible_file="$LIBRARY_DIR/$project/bible.jsonl"
+    
+    if [ ! -f "$bible_file" ]; then
+        echo -e "${RED}Error: Project '$project' not found${NC}"
+        exit 1
+    fi
+    
+    echo -e "${CYAN}=== Searching $project for: '$tag' ===${NC}"
+    echo ""
+    
+    grep "\"$tag\"" "$bible_file" | while read -r line; do
+        echo "$line" | jq -r '"\(.type): [\(.id)] \(.symptom // .name // .text // .title)"'
+    done
+}
+
+search_master() {
+    local tag="$1"
+    
+    if [ ! -f "$MASTER_BIBLE" ]; then
+        echo -e "${RED}Error: Master Bible not found${NC}"
+        exit 1
+    fi
+    
+    echo -e "${CYAN}=== Searching Master Bible for: '$tag' ===${NC}"
+    echo ""
+    
+    grep "\"$tag\"" "$MASTER_BIBLE" | while read -r line; do
+        echo "$line" | jq -r '"\(.type): [\(.id)] \(.symptom // .name // .text // .title)"'
+    done
+}
+
+show_personal() {
+    echo -e "${CYAN}=== Your Personal Flaws & Patterns ===${NC}"
+    echo ""
+    
+    if [ ! -f "$MASTER_BIBLE" ]; then
+        echo -e "${RED}No master Bible found${NC}"
+        exit 1
+    fi
+    
+    echo -e "${RED}Mistakes you repeat:${NC}"
+    grep '"MISTAKE"' "$MASTER_BIBLE" | jq -r '"  [\(.id)] \(.symptom)"'
+    
+    echo ""
+    echo -e "${GREEN}Patterns you use:${NC}"
+    grep '"PATTERN"' "$MASTER_BIBLE" | jq -r '"  [\(.id)] \(.name)"'
+    
+    echo ""
+    echo -e "${BLUE}Principles you follow:${NC}"
+    grep '"PRINCIPLE"' "$MASTER_BIBLE" | jq -r '"  [\(.id)] \(.text)"'
+}
+
+# Main logic
+case "${1:-}" in
+    --help|-h|"")
+        show_help
+        ;;
+    --stats)
+        show_stats
+        ;;
+    --list)
+        list_projects
+        ;;
+    --personal)
+        show_personal
+        ;;
+    --master)
+        search_master "$2"
+        ;;
+    --mistakes)
+        search_all "$2" '"MISTAKE"'
+        ;;
+    --patterns)
+        search_all "$2" '"PATTERN"'
+        ;;
+    *)
+        if [ -n "${2:-}" ]; then
+            search_project "$1" "$2"
+        else
+            search_all "$1" ""
+        fi
+        ;;
+esac
