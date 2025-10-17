@@ -66,6 +66,7 @@ bible <your-topic>
 **Start Here:**
 - `dev_bibles/COMPLETE_SYSTEM.txt` - Full system overview
 - `dev_bibles/QUICKSTART.md` - 2-minute setup guide
+- **`AI_LEARNING_PLATFORMS.md`** - 185 lessons from real AI projects ⭐ NEW
 
 **Single-Project Bible:**
 - `README.md` - Project Bible documentation
@@ -76,6 +77,12 @@ bible <your-topic>
 **Multi-Project Library:**
 - `dev_bibles/README.md` - Library system guide
 - `dev_bibles/_master/README.md` - Master Bible philosophy
+
+**Automation Tools:**
+- `tooling/extractors/git2kb.py` - Extract knowledge from Git history
+- `tooling/extractors/pr2kb.py` - Extract knowledge from GitHub PRs
+- `tooling/validators/validate_kb.py` - Validate knowledge base
+- `tooling/validators/validate_cards.py` - Validate PR cards (CI-ready)
 
 ## 🎯 The Two Layers
 
