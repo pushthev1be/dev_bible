@@ -64,9 +64,10 @@ bible <your-topic>
 ## 📚 Documentation
 
 **Start Here:**
+- **`BEST_PRACTICES.md`** - Comprehensive best practices from web research + industry standards ⭐ NEW
 - `dev_bibles/COMPLETE_SYSTEM.txt` - Full system overview
 - `dev_bibles/QUICKSTART.md` - 2-minute setup guide
-- **`AI_LEARNING_PLATFORMS.md`** - 185 lessons from real AI projects ⭐ NEW
+- **`AI_LEARNING_PLATFORMS.md`** - 185 lessons from real AI projects
 
 **Single-Project Bible:**
 - `README.md` - Project Bible documentation
