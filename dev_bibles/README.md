@@ -336,6 +336,17 @@ Your competitive advantage grows with every lesson.
 - **Single-Project Template**: See `/home/ubuntu/dev_bible/`
 - **Commands**: Run `bible-help` or `bible --help`
 
+## Quick-Recall Aliases
+
+For quick access to major Bible sections, use the aliases defined in `ALIASES.md` and `index.json`:
+
+```bash
+source dev_bibles/aliases.sh
+# then run e.g.
+bible master
+bible ai-platforms
+```
+
 ---
 
 **Your knowledge compounds. Every lesson written saves time forever.**

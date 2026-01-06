@@ -1,0 +1,9 @@
+{
+  "bible:master": {"path": "dev_bibles/_master/bible.jsonl", "examples": ["p.search_before_code", "p.document_immediately", "m.personal.wallet_validation"], "desc": "Cross-project personal rules and recurring mistakes."},
+  "bible:template": {"path": "./bible.jsonl", "examples": ["p.controllers_thin", "m.auth_bypass.2025-10-16", "rb.add_endpoint.v1"], "desc": "Single-project template and starter lessons."},
+  "bible:study-ai": {"path": "dev_bibles/STUDY-AI/bible.jsonl", "examples": ["pat.spaced_repetition.v1", "pat.pagination_standard.v1", "m.sql_injection.2025-10-15"], "desc": "Study-AI project lessons."},
+  "bible:ai-platforms": {"path": "AI_LEARNING_PLATFORMS.md", "examples": ["pat.subject_detection", "pat.parallel_api_generation", "m.memory_leak.chunking"], "desc": "AI learning platform guide and patterns."},
+  "bible:tooling": {"path": "tooling/", "examples": ["tooling/extractors/git2kb.py", "tooling/validators/validate_kb.py"], "desc": "Automation scripts and validators."},
+  "bible:docs": {"path": "README.md", "examples": ["USAGE_GUIDE.md", "CHEATSHEET.md"], "desc": "Documentation and onboarding."},
+  "bible:utils": {"path": "validate.py", "examples": ["init-bible.sh", "Makefile"], "desc": "Utilities and bootstrap scripts."}
+}
