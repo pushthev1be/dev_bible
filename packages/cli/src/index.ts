@@ -18,13 +18,17 @@ import type { Entry, Project, EntryCategory } from '@devbrain/core';
 import { nanoid } from 'nanoid';
 import { homedir, tmpdir } from 'os';
 
-// Load key from ~/.devbrain/.env if not already in environment
+// Load config from ~/.devbrain/.env (GEMINI_API_KEY, Vertex AI vars, MONGODB_URI, …).
+// Loaded unconditionally; real environment variables take precedence, comments skipped.
 const globalEnvPath = join(homedir(), '.devbrain', '.env');
-if (!process.env.GEMINI_API_KEY && existsSync(globalEnvPath)) {
+if (existsSync(globalEnvPath)) {
   const lines = readFileSync(globalEnvPath, 'utf-8').replace(/^﻿/, '').split('\n');
   for (const line of lines) {
-    const [key, ...rest] = line.split('=');
-    if (key?.trim() && rest.length) process.env[key.trim()] = rest.join('=').trim();
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [key, ...rest] = trimmed.split('=');
+    const k = key?.trim();
+    if (k && rest.length && process.env[k] === undefined) process.env[k] = rest.join('=').trim();
   }
 }
 
@@ -983,12 +987,15 @@ async function runOnboarding(): Promise<void> {
   const stageHeader = (n: number, total: number, label: string) =>
     `  ${BOLD}${CYAN}[${n}/${total}]${RESET}  ${BOLD}${label}${RESET}`;
 
-  console.log(stageHeader(1, 3, 'Gemini API Key'));
+  console.log(stageHeader(1, 3, 'Gemini Credentials'));
   console.log(`  ${DIM}Used for semantic search and auto-capture from commits.${RESET}`);
-  console.log(`  ${DIM}Free key at https://aistudio.google.com${RESET}\n`);
+  console.log(`  ${DIM}Vertex AI (Google Cloud) or a free key at https://aistudio.google.com${RESET}\n`);
 
-  const alreadyHasKey = !!process.env.GEMINI_API_KEY;
-  if (alreadyHasKey) {
+  const usingVertex = ['true', '1'].includes((process.env.GOOGLE_GENAI_USE_VERTEXAI ?? '').toLowerCase()) && !!process.env.GOOGLE_CLOUD_PROJECT;
+  const alreadyHasKey = !!process.env.GEMINI_API_KEY || usingVertex;
+  if (usingVertex) {
+    console.log(`  ${GREEN}✓${RESET} Vertex AI configured (project ${process.env.GOOGLE_CLOUD_PROJECT})\n`);
+  } else if (alreadyHasKey) {
     console.log(`  ${GREEN}✓${RESET} API key already set\n`);
   } else {
     const { apiKey } = await inq.prompt([{

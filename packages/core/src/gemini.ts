@@ -1,6 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type { ExtractedKnowledge, EntryCategory, Entry } from './types';
 import { ENTRY_CATEGORIES } from './types';
+
+const TEXT_MODEL = 'gemini-2.0-flash';
+const EMBED_MODEL = 'gemini-embedding-001';
+const EMBED_DIM = 3072;
 
 export class RateLimitError extends Error {
   retryAfter: number;
@@ -22,21 +26,58 @@ function parseRetryDelay(body: string): number {
 }
 
 function rethrowIfRateLimit(err: unknown): never {
-  if (err instanceof Error && (err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED'))) {
-    throw new RateLimitError();
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+    throw new RateLimitError(parseRetryDelay(msg));
   }
   throw err;
 }
 
-let client: GoogleGenerativeAI | null = null;
+function useVertex(): boolean {
+  const v = (process.env.GOOGLE_GENAI_USE_VERTEXAI ?? '').toLowerCase();
+  return v === 'true' || v === '1';
+}
 
-function getClient(): GoogleGenerativeAI {
+let client: GoogleGenAI | null = null;
+
+function getClient(): GoogleGenAI {
   if (!client) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY is not set. Run: export GEMINI_API_KEY=your_key');
-    client = new GoogleGenerativeAI(apiKey);
+    if (useVertex()) {
+      // Google Cloud AI path — Gemini on Vertex AI, authenticated via ADC.
+      const project = process.env.GOOGLE_CLOUD_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+      if (!project) {
+        throw new Error(
+          'GOOGLE_CLOUD_PROJECT is not set. Required when GOOGLE_GENAI_USE_VERTEXAI=true. ' +
+          'Set GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION, and ensure ADC is configured ' +
+          '(gcloud auth application-default login, or a service account on Cloud Run).'
+        );
+      }
+      client = new GoogleGenAI({ vertexai: true, project, location });
+    } else {
+      // Gemini Developer API path (AI Studio) — used for local/offline dev.
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          'No Gemini credentials. Set GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT ' +
+          'for Vertex AI, or GEMINI_API_KEY for the Gemini Developer API.'
+        );
+      }
+      client = new GoogleGenAI({ vertexai: false, apiKey });
+    }
   }
   return client;
+}
+
+async function generateText(prompt: string): Promise<string> {
+  const res = await getClient().models.generateContent({ model: TEXT_MODEL, contents: prompt });
+  return (res.text ?? '').trim();
+}
+
+/** True when a Gemini backend is configured (either Vertex AI or the Developer API). */
+function hasGeminiCreds(): boolean {
+  if (useVertex()) return Boolean(process.env.GOOGLE_CLOUD_PROJECT);
+  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 }
 
 export async function extractKnowledge(diff: string, commitMessage: string): Promise<ExtractedKnowledge | null> {
@@ -105,8 +146,6 @@ export async function extractKnowledge(diff: string, commitMessage: string): Pro
   }
 
   try {
-    const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
-
     const categoryList = ENTRY_CATEGORIES.join(' | ');
     const prompt = `You are analyzing a git commit to extract developer knowledge. Be specific and technical.
 
@@ -129,8 +168,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 If this commit is just a merge, version bump, or has no meaningful knowledge, return:
 {"skip": true}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await generateText(prompt);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
@@ -169,29 +207,20 @@ export async function getEmbedding(text: string): Promise<number[]> {
     return vec;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: { parts: [{ text }] } }),
+  try {
+    const res = await getClient().models.embedContent({
+      model: EMBED_MODEL,
+      contents: text,
+      config: { outputDimensionality: EMBED_DIM },
+    });
+    const values = res.embeddings?.[0]?.values;
+    if (!values || values.length === 0) {
+      throw new Error('Embedding response contained no values');
     }
-  );
-
-  if (res.status === 429) {
-    const body = await res.text();
-    throw new RateLimitError(parseRetryDelay(body));
+    return values;
+  } catch (err) {
+    rethrowIfRateLimit(err);
   }
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Embedding API error ${res.status}: ${err}`);
-  }
-
-  const data = await res.json() as { embedding: { values: number[] } };
-  return data.embedding.values;
 }
 
 export async function summarizeProjectHistory(entries: { title: string; content: string; type: string }[]): Promise<string> {
@@ -202,13 +231,11 @@ export async function summarizeProjectHistory(entries: { title: string; content:
   if (entries.length === 0) return 'No knowledge captured yet.';
 
   try {
-    const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
     const sample = entries.slice(0, 15).map(e => `[${e.type}] ${e.title}: ${e.content}`).join('\n');
 
     const prompt = `Summarize a developer's experience on this project in 2-3 sentences. Focus on patterns, recurring issues, and key learnings:\n\n${sample}`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    return await generateText(prompt);
   } catch (err) {
     rethrowIfRateLimit(err);
   }
@@ -222,9 +249,8 @@ export async function synthesizeSection(
     return "• ALWAYS return cleanups for event subscriptions inside React hooks\n• Standardize off-listeners in statusEmitter calls";
   }
 
-  if (entries.length < 2 || !process.env.GEMINI_API_KEY) return null;
+  if (entries.length < 2 || !hasGeminiCreds()) return null;
   try {
-    const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
     const items = entries
       .map(e => `[${e.type}] ${e.title}: ${e.content.slice(0, 200)}`)
       .join('\n');
@@ -232,8 +258,7 @@ export async function synthesizeSection(
       `You are DevBrain, a developer knowledge system. Compress these related ${label} entries into ` +
       `2-4 bullet points capturing the essential pattern, recurring root cause, or key insight. ` +
       `Each bullet must be specific and actionable. Return ONLY the bullet points, each starting with "•", no headers.\n\n${items}`;
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    return await generateText(prompt);
   } catch {
     return null;
   }
@@ -250,13 +275,11 @@ export async function classifyQuery(query: string): Promise<{ category: EntryCat
 
   const categoryList = ENTRY_CATEGORIES.join(' | ');
   try {
-    const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
     const prompt =
       `Classify this developer problem query for search routing. Return ONLY valid JSON:\n` +
       `{ "category": one of [${categoryList}], "errorPattern": "extracted error text if present, else omit" }\n\n` +
       `Query: "${query}"`;
-    const result = await model.generateContent(prompt);
-    const text   = result.response.text().trim();
+    const text   = await generateText(prompt);
     const match  = text.match(/\{[\s\S]*\}/);
     if (!match) return { category: 'other' };
     const parsed = JSON.parse(match[0]);
@@ -280,9 +303,8 @@ export interface RecapEntry {
 }
 
 export async function recapSession(sessionText: string): Promise<RecapEntry[]> {
-  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
+  if (!hasGeminiCreds()) throw new Error('No Gemini credentials configured (set GOOGLE_GENAI_USE_VERTEXAI + GOOGLE_CLOUD_PROJECT, or GEMINI_API_KEY)');
   const categoryList = ENTRY_CATEGORIES.join(' | ');
-  const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
   const prompt =
     `You are DevBrain, a developer knowledge system. Analyze this coding session transcript and extract ` +
     `every piece of knowledge worth preserving for future sessions. Be specific and technical.\n\n` +
@@ -303,8 +325,7 @@ export async function recapSession(sessionText: string): Promise<RecapEntry[]> {
     `If nothing worth saving was found, return: []\n\n` +
     `Session transcript:\n${sessionText.slice(0, 12000)}`;
 
-  const result = await model.generateContent(prompt);
-  const text   = result.response.text().trim();
+  const text   = await generateText(prompt);
   const match  = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
   try {
@@ -321,16 +342,13 @@ export async function findMatchExplanation(query: string, matchedEntry: { title:
   }
 
   try {
-    const model = getClient().getGenerativeModel({ model: 'gemini-2.0-flash' });
-
     const prompt = `A developer is facing: "${query}"
 
     A past solution was found: "${matchedEntry.title} - ${matchedEntry.content}"
 
     In one sentence, explain why this past solution is relevant to the current problem.`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    return await generateText(prompt);
   } catch {
     return '';
   }

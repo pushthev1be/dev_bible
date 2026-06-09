@@ -23,8 +23,20 @@ export async function runAgent(
   query: string,
   mcpUrl: string
 ): Promise<string> {
-  // ADK uses GOOGLE_API_KEY; map from GEMINI_API_KEY if needed
-  if (process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+  // Prefer Gemini on Vertex AI (Google Cloud). ADK reads GOOGLE_GENAI_USE_VERTEXAI
+  // together with GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION and authenticates via ADC
+  // (e.g. the Cloud Run service account). Fall back to the Gemini Developer API key for
+  // local/offline development only.
+  const useVertex = ['true', '1'].includes((process.env.GOOGLE_GENAI_USE_VERTEXAI ?? '').toLowerCase());
+  if (useVertex) {
+    if (!process.env.GOOGLE_CLOUD_PROJECT) {
+      throw new Error(
+        'GOOGLE_GENAI_USE_VERTEXAI=true requires GOOGLE_CLOUD_PROJECT (and ideally GOOGLE_CLOUD_LOCATION).'
+      );
+    }
+    process.env.GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+  } else if (process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+    // ADK reads GOOGLE_API_KEY for the Developer API path.
     process.env.GOOGLE_API_KEY = process.env.GEMINI_API_KEY;
   }
 

@@ -21,12 +21,16 @@ import { nanoid } from 'nanoid';
 import { mongoMcpFind } from './mongoMcp';
 import { runAgent } from './agent';
 
-// Load GEMINI_API_KEY from ~/.devbrain/.env
+// Load config from ~/.devbrain/.env (GEMINI_API_KEY, Vertex AI vars, MONGODB_URI, …).
+// Loaded unconditionally; real environment variables take precedence, comments skipped.
 const envPath = join(homedir(), '.devbrain', '.env');
-if (!process.env.GEMINI_API_KEY && existsSync(envPath)) {
-  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-    const [k, ...v] = line.split('=');
-    if (k?.trim()) process.env[k.trim()] = v.join('=').trim();
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf-8').replace(/^﻿/, '').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [k, ...v] = trimmed.split('=');
+    const key = k?.trim();
+    if (key && v.length && process.env[key] === undefined) process.env[key] = v.join('=').trim();
   }
 }
 

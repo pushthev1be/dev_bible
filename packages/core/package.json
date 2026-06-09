@@ -8,7 +8,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
+    "@google/genai": "^1.52.0",
     "lowdb": "^7.0.1",
     "mongodb": "^7.2.0",
     "nanoid": "^3.3.11",
