@@ -28,6 +28,8 @@ Every registered project writes to one shared MongoDB Atlas knowledge base, so a
 
 <img width="1836" height="909" alt="Image" src="https://github.com/user-attachments/assets/5e286c59-708e-4a96-bbd1-5d0733dbce46" />
 ---
+<img width="1689" height="707" alt="Image" src="https://github.com/user-attachments/assets/a69b0fdf-be49-4ed1-9e92-76df1406357a" />
+
 
 ## Install
 
