@@ -2,6 +2,15 @@
 
 Persistent developer memory for you and your AI agents. Captures technical knowledge from git commits, lets you save typed notes instantly, and injects ranked context into Gemini and other MCP-compliant agents before they start work — so they already know what broke before, what was decided, and why.
 
+**🚀 Live demo:** **https://devbrain-oujuoveyvq-uc.a.run.app** — dashboard + team feed, with the agent at `POST /agent` and the MCP server at `/mcp`. Runs on **Gemini 2.5 Flash (Vertex AI)** + **MongoDB Atlas Vector Search** on **Google Cloud Run**.
+
+```bash
+# Ask the deployed agent (Gemini 2.5 Flash on Vertex AI) anything in your team's memory:
+curl -X POST https://devbrain-oujuoveyvq-uc.a.run.app/agent \
+  -H "Content-Type: application/json" \
+  -d '{"query":"any fixes for mobile safe-area overlap?"}'
+```
+
 <img width="923" height="866" alt="image" src="https://github.com/user-attachments/assets/68591649-0049-4e8d-bb72-620ffb604a91" />
 
 ---
