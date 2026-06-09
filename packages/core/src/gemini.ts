@@ -2,8 +2,11 @@ import { GoogleGenAI } from '@google/genai';
 import type { ExtractedKnowledge, EntryCategory, Entry } from './types';
 import { ENTRY_CATEGORIES } from './types';
 
-const TEXT_MODEL = 'gemini-2.0-flash';
-const EMBED_MODEL = 'gemini-embedding-001';
+// Model is overridable via GEMINI_MODEL. Default is gemini-2.5-flash — the current
+// Flash model, available on both the Gemini Developer API and Vertex AI (incl. the
+// `global` location used by AI-Studio-origin projects, where 2.0-flash is unavailable).
+const TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
 const EMBED_DIM = 3072;
 
 export class RateLimitError extends Error {

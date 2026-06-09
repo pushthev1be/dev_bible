@@ -703,7 +703,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       <button class="sidebar-item" id="nav-feed" onclick="switchTab('feed')"><span class="ic">👥</span> Team Feed</button>
       <div class="sidebar-divider"></div>
       <div class="sidebar-label">Stack</div>
-      <div class="sidebar-item" style="cursor:default;color:var(--text3)"><span class="ic">&diams;</span> Gemini 2.0 Flash</div>
+      <div class="sidebar-item" style="cursor:default;color:var(--text3)"><span class="ic">&diams;</span> Gemini 2.5 Flash</div>
       <div class="sidebar-item" style="cursor:default;color:var(--text3)"><span class="ic">&diams;</span> MongoDB Atlas</div>
       <div class="sidebar-item" style="cursor:default;color:var(--text3)"><span class="ic">&diams;</span> Google Cloud Run</div>
       <div class="sidebar-divider"></div>
@@ -803,7 +803,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   <div class="statusbar">
     <span>devbrain v0.1.0</span><span>|</span>
-    <span>Gemini 2.0 Flash</span><span>|</span>
+    <span>Gemini 2.5 Flash</span><span>|</span>
     <span>MongoDB Atlas</span><span>|</span>
     <span>MCP: /mcp</span>
   </div>
@@ -1099,7 +1099,7 @@ const httpServer = createServer(async (req, res) => {
           if (!query?.trim()) { json(res, 400, { error: 'query is required' }); return; }
           const mcpUrl = `http://localhost:${PORT}/mcp`;
           const response = await runAgent(query, mcpUrl);
-          json(res, 200, { response, powered_by: 'Google ADK + Gemini 2.0 Flash + DevBrain MCP' });
+          json(res, 200, { response, powered_by: 'Google ADK + Gemini 2.5 Flash (Vertex AI) + DevBrain MCP' });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           const status = msg.includes('429') || msg.includes('quota') ? 429 : 500;

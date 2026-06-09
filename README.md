@@ -73,7 +73,7 @@ For hosted developer teams, DevBrain is optimized for cloud deployment and suppo
 
 ## Running on Vertex AI (Google Cloud)
 
-In production DevBrain runs Gemini — both reasoning (`gemini-2.0-flash`) and embeddings (`gemini-embedding-001`, 3072-dim) — on **Vertex AI**, Google Cloud's managed AI platform. The ADK agent ([`packages/mcp/src/agent.ts`](packages/mcp/src/agent.ts)) and the core extraction/embedding pipeline ([`packages/core/src/gemini.ts`](packages/core/src/gemini.ts)) both honor the same backend switch, so a single set of environment variables moves the whole system onto Google Cloud AI.
+In production DevBrain runs Gemini — both reasoning (`gemini-2.5-flash`) and embeddings (`gemini-embedding-001`, 3072-dim) — on **Vertex AI**, Google Cloud's managed AI platform. The ADK agent ([`packages/mcp/src/agent.ts`](packages/mcp/src/agent.ts)) and the core extraction/embedding pipeline ([`packages/core/src/gemini.ts`](packages/core/src/gemini.ts)) both honor the same backend switch, so a single set of environment variables moves the whole system onto Google Cloud AI.
 
 **1. Enable the API and grant access** (one-time, on a billing-enabled project):
 
@@ -90,9 +90,11 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT \
 ```bash
 GOOGLE_GENAI_USE_VERTEXAI=true
 GOOGLE_CLOUD_PROJECT=YOUR_PROJECT
-GOOGLE_CLOUD_LOCATION=us-central1
-MONGODB_URI=...            # your Atlas connection string
+GOOGLE_CLOUD_LOCATION=global   # AI-Studio-origin projects serve Gemini chat via `global`
+MONGODB_URI=...                # your Atlas connection string
 ```
+
+> **Model/location note:** `gemini-2.5-flash` is the default chat model and is served from the `global` location on Vertex (regional locations like `us-central1` also work for embeddings). On projects created through Google AI Studio (`gen-lang-client-*`), `gemini-2.0-flash` is unavailable on Vertex — use `gemini-2.5-flash`. Override with `GEMINI_MODEL` if needed.
 
 **3. Authentication is automatic.** On Cloud Run, Gemini calls authenticate via the attached service account through Application Default Credentials (ADC) — no API key or key file. To test the Vertex path locally:
 
@@ -255,7 +257,7 @@ After `devbrain /init`, a post-commit hook runs after every commit. Gemini extra
 
 **MongoDB Atlas for Cloud Scaling & Stored Vectors** — Employs a robust hosted MongoDB Atlas database for technical vector searches. High-dimensional technical embeddings (3072 dimensions) are matched against `$vectorSearch` cosine-similarity indexes directly in the cloud. For offline development, testing, and demo recording, `DEVBRAIN_MOCK=true` intercepts all Gemini calls with deterministic mock vectors and extractions — no API key or network required.
 
-**Gemini on Vertex AI & High-Dimensional Embeddings** — Both reasoning and embeddings run on **Vertex AI**, Google Cloud's managed AI platform, via the unified `@google/genai` SDK and Application Default Credentials (no API keys in production). `gemini-embedding-001` produces 3072-dimension embeddings — higher dimensionality improves retrieval precision for technical content where subtle semantic differences matter — and `gemini-2.0-flash` handles knowledge extraction and context synthesis in real time. A single env switch (`GOOGLE_GENAI_USE_VERTEXAI`) falls back to the Gemini Developer API for offline/local dev without changing model IDs or the embedding schema.
+**Gemini on Vertex AI & High-Dimensional Embeddings** — Both reasoning and embeddings run on **Vertex AI**, Google Cloud's managed AI platform, via the unified `@google/genai` SDK and Application Default Credentials (no API keys in production). `gemini-embedding-001` produces 3072-dimension embeddings — higher dimensionality improves retrieval precision for technical content where subtle semantic differences matter — and `gemini-2.5-flash` handles knowledge extraction and context synthesis in real time. A single env switch (`GOOGLE_GENAI_USE_VERTEXAI`) falls back to the Gemini Developer API for offline/local dev without changing model IDs or the embedding schema.
 
 **High-Fidelity Offline Mock Mode (`DEVBRAIN_MOCK=true`)** — Integrates a comprehensive simulation engine that intercepts all Gemini LLM and embedding API calls. When enabled, it dynamically serves realistic mock extractions, classifications, and project recaps. This enables offline development, CI/CD testing, and rate-limit-free video demonstrations without requiring active API keys.
 
@@ -278,7 +280,7 @@ After `devbrain /init`, a post-commit hook runs after every commit. Gemini extra
 
 - **Runtime**: Node.js
 - **Language**: TypeScript
-- **AI Backend**: Gemini on **Vertex AI** (Google Cloud) — `gemini-2.0-flash` (extraction, synthesis) · `gemini-embedding-001` (semantic search, 3072-dim). Falls back to the Gemini Developer API for local dev.
+- **AI Backend**: Gemini on **Vertex AI** (Google Cloud) — `gemini-2.5-flash` (extraction, synthesis) · `gemini-embedding-001` (semantic search, 3072-dim). Falls back to the Gemini Developer API for local dev.
 - **Agent**: Google ADK (`@google/adk`) `LlmAgent` consuming the DevBrain + MongoDB MCP servers
 - **Database**: MongoDB Atlas (Vector Search indices)
 - **Deployment**: Google Cloud Run (SSE HTTP server transport, ADC auth to Vertex AI)

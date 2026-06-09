@@ -47,7 +47,7 @@ export async function runAgent(
 
   const agent = new LlmAgent({
     name: 'devbrain',
-    model: 'gemini-2.0-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     description: 'Developer knowledge assistant powered by DevBrain and Gemini',
     instruction: AGENT_INSTRUCTION,
     tools: [mcpToolset],
