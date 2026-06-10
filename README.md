@@ -26,7 +26,7 @@ Every registered project writes to one shared MongoDB Atlas knowledge base, so a
 - **The Team Feed**: The web dashboard renders a shared activity timeline of the latest fixes, decisions, and patterns across all registered codebases, each labeled with its project and stack.
 - **CLI sibling alerts**: When you load context in the CLI, DevBrain surfaces the most recent entries from your *other* projects (e.g. surfacing a layout fix saved in a mobile repo while you work on a web frontend), so solutions cross repository boundaries instead of being re-derived.
 
-<img width="1836" height="909" alt="Image" src="https://github.com/user-attachments/assets/5e286c59-708e-4a96-bbd1-5d0733dbce46" />
+<img width="1315" height="580" alt="Image" src="https://github.com/user-attachments/assets/50542418-3346-45d7-8987-8124762487b4" />
 ---
 <img width="1689" height="707" alt="Image" src="https://github.com/user-attachments/assets/a69b0fdf-be49-4ed1-9e92-76df1406357a" />
 
